@@ -1,757 +1,646 @@
-// Physics & Scale Settings
-const G = 0.15; // Gravitational constant scaled for screen dimensions
-const DEFAULT_SUN_MASS = 10000;
+// ============================================================
+//  SOLAR GRAVITY SIMULATOR — simulation.js
+//  All English. Physics: Newtonian gravity, Euler integration
+// ============================================================
+
+// ---- Constants ----
+const G                  = 0.15;
+const DEFAULT_SUN_MASS   = 10000;
 const DEFAULT_SUN_RADIUS = 22;
-const EARTH_MASS_FOR_MOON = 80;
+const EARTH_MASS_MOON    = 80;
 
+// ---- State ----
 let sunMassMultiplier = 1.0;
-let simSpeed = 1.0;
-let isPaused = false;
-let activeMode = 'pan'; // 'pan' or 'launch'
+let simSpeed          = 1.0;
+let isPaused          = false;
+let activeMode        = 'pan'; // 'pan' | 'launch'
 
-// Zoom and Pan offsets
-let offsetX = 0;
-let offsetY = 0;
-let zoom = 0.95;
-let isDragging = false;
-let startDragX = 0;
-let startDragY = 0;
+// Viewport
+let offsetX = 0, offsetY = 0, zoom = 0.9;
 
-// Slingshot Planet Launcher State
-let isDrawingSlingshot = false;
+// Pan dragging
+let isDragging  = false;
+let startDragX  = 0, startDragY = 0;
+
+// Slingshot
+let isSlingshot    = false;
 let slingshotStart = { x: 0, y: 0 };
-let slingshotEnd = { x: 0, y: 0 };
-let customPlanetsCount = 1;
+let slingshotEnd   = { x: 0, y: 0 };
+let customCount    = 1;
 
-// Web Audio API State
-let audioCtx = null;
-let isMuted = true;
-let ambientOscs = [];
+// Audio
+let audioCtx    = null;
+let isMuted     = true;
 let ambientGain = null;
 
-// DOM Elements
-const simCanvas = document.getElementById('simulationCanvas');
-const simCtx = simCanvas.getContext('2d');
+// Touch pinch-zoom
+let lastTouchDist   = 0;
+let lastTouchMidX   = 0;
+let lastTouchMidY   = 0;
+let lastTouchZoom   = 1;
+let lastTouchOffX   = 0;
+let lastTouchOffY   = 0;
 
-const starsCanvas = document.getElementById('starsCanvas');
-const starsCtx = starsCanvas.getContext('2d');
+// ---- DOM ----
+const simCanvas        = document.getElementById('simulationCanvas');
+const simCtx           = simCanvas.getContext('2d');
+const starsCanvas      = document.getElementById('starsCanvas');
+const starsCtx         = starsCanvas.getContext('2d');
 
-const sunMassSlider = document.getElementById('sunMassSlider');
-const sunMassValue = document.getElementById('sunMassValue');
-const simSpeedSlider = document.getElementById('simSpeedSlider');
-const simSpeedValue = document.getElementById('simSpeedValue');
+const sunMassSlider    = document.getElementById('sunMassSlider');
+const sunMassValue     = document.getElementById('sunMassValue');
+const simSpeedSlider   = document.getElementById('simSpeedSlider');
+const simSpeedValue    = document.getElementById('simSpeedValue');
 
-const btnPlayPause = document.getElementById('btnPlayPause');
-const btnReset = document.getElementById('btnReset');
-const btnClearTrails = document.getElementById('btnClearTrails');
-const alertOverlay = document.getElementById('alertOverlay');
-const planetStatsBody = document.getElementById('planetStatsBody');
+const btnPlayPause     = document.getElementById('btnPlayPause');
+const btnReset         = document.getElementById('btnReset');
+const btnClearTrails   = document.getElementById('btnClearTrails');
+const btnToggleAudio   = document.getElementById('btnToggleAudio');
+const btnTogglePanel   = document.getElementById('btnTogglePanel');
+const btnClosePanel    = document.getElementById('btnClosePanel');
+const mainPanel        = document.getElementById('mainPanel');
+const alertOverlay     = document.getElementById('alertOverlay');
+const planetStatsBody  = document.getElementById('planetStatsBody');
+const modePan          = document.getElementById('modePan');
+const modeLaunch       = document.getElementById('modeLaunch');
+const hintBar          = document.getElementById('hintBar');
+const btnDismissHint   = document.getElementById('btnDismissHint');
 
-const btnToggleAudio = document.getElementById('btnToggleAudio');
-const dashboardToggle = document.getElementById('dashboardToggle');
-const mainDashboard = document.getElementById('mainDashboard');
-
-const modePan = document.getElementById('modePan');
-const modeLaunch = document.getElementById('modeLaunch');
-
-// Presets
-const presets = {
-    presetNormal: 1.0,
-    presetHeavy: 3.5,
-    presetSupernova: 8.0,
-    presetLight: 0.25,
-    presetZero: 0.0
-};
-
-// Planet templates (static orbital definitions)
-const planetTemplates = [
-    { id: 'mercury', name: 'Mercury', distance: 60, radius: 3.5, color: '#9e9e9e' },
-    { id: 'venus', name: 'Venus', distance: 95, radius: 6.0, color: '#e29b3e' },
-    { id: 'earth', name: 'Earth', distance: 135, radius: 6.8, color: '#3a86c8', hasMoon: true },
-    { id: 'mars', name: 'Mars', distance: 180, radius: 4.8, color: '#e55039' },
-    { id: 'jupiter', name: 'Jupiter', distance: 245, radius: 14.0, color: '#d4a373' },
-    { id: 'saturn', name: 'Saturn', distance: 315, radius: 11.0, color: '#eddcd2', hasRings: true },
-    { id: 'uranus', name: 'Uranus', distance: 380, radius: 8.5, color: '#a8dadc' },
-    { id: 'neptune', name: 'Neptune', distance: 440, radius: 8.0, color: '#457b9d' }
+// ---- Planet Templates (100% English) ----
+const PLANET_TEMPLATES = [
+    { id:'mercury', name:'Mercury',  dist: 60,  r: 3.5,  color:'#9e9e9e' },
+    { id:'venus',   name:'Venus',    dist: 95,  r: 6.0,  color:'#e29b3e' },
+    { id:'earth',   name:'Earth',    dist:135,  r: 6.8,  color:'#3a86c8', hasMoon:true },
+    { id:'mars',    name:'Mars',     dist:180,  r: 4.8,  color:'#e55039' },
+    { id:'jupiter', name:'Jupiter',  dist:245,  r:14.0,  color:'#d4a373' },
+    { id:'saturn',  name:'Saturn',   dist:315,  r:11.0,  color:'#eddcd2', hasRings:true },
+    { id:'uranus',  name:'Uranus',   dist:380,  r: 8.5,  color:'#a8dadc' },
+    { id:'neptune', name:'Neptune',  dist:440,  r: 8.0,  color:'#457b9d' },
 ];
 
-// Objects
-let sun = {
-    x: 0,
-    y: 0,
-    mass: DEFAULT_SUN_MASS,
-    radius: DEFAULT_SUN_RADIUS,
-    color: '#ffcc00'
-};
-
+// ---- Simulation Objects ----
+let sun = { x:0, y:0, mass: DEFAULT_SUN_MASS, radius: DEFAULT_SUN_RADIUS };
 let planets = [];
 let asteroids = [];
-let stars = [];
 let moon = null;
+let stars = [];
 
-// Audio Synthesizer Engine
+// ============================================================
+//  WEB AUDIO SYNTHESIZER
+// ============================================================
 function initAudio() {
     if (audioCtx) return;
-    
     try {
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        audioCtx = new AudioContextClass();
-        
-        // Master Gain
+        audioCtx   = new (window.AudioContext || window.webkitAudioContext)();
         ambientGain = audioCtx.createGain();
-        ambientGain.gain.setValueAtTime(0.0, audioCtx.currentTime); // Start silent
+        ambientGain.gain.value = 0;
         ambientGain.connect(audioCtx.destination);
-        
+
         const filter = audioCtx.createBiquadFilter();
         filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(250, audioCtx.currentTime);
+        filter.frequency.value = 260;
         filter.connect(ambientGain);
-        
-        // Multi-oscillator space chord (C2, G2, C3, Eb3 - Minor Cosmic drone)
-        const frequencies = [65.41, 98.00, 130.81, 155.56];
-        frequencies.forEach(freq => {
-            const osc = audioCtx.createOscillator();
+
+        // Cosmic drone chord
+        [65.41, 98.0, 130.81, 155.56].forEach(freq => {
+            const osc  = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
             osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-            
-            const oscGain = audioCtx.createGain();
-            oscGain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-            
-            osc.connect(oscGain);
-            oscGain.connect(filter);
+            osc.frequency.value = freq;
+            gain.gain.value = 0.18;
+            osc.connect(gain);
+            gain.connect(filter);
             osc.start();
-            ambientOscs.push(osc);
         });
-        
-        // Very slow LFO modulating filter frequency
-        const lfo = audioCtx.createOscillator();
-        lfo.frequency.setValueAtTime(0.05, audioCtx.currentTime); 
-        
-        const lfoGain = audioCtx.createGain();
-        lfoGain.gain.setValueAtTime(100, audioCtx.currentTime);
-        
-        lfo.connect(lfoGain);
-        lfoGain.connect(filter.frequency);
+
+        // Very-slow LFO on filter for movement
+        const lfo  = audioCtx.createOscillator();
+        const lfog = audioCtx.createGain();
+        lfo.frequency.value = 0.04;
+        lfog.gain.value = 90;
+        lfo.connect(lfog);
+        lfog.connect(filter.frequency);
         lfo.start();
-        
-        // Smoothly fade in ambient drone
-        if (!isMuted) {
-            ambientGain.gain.linearRampToValueAtTime(0.04, audioCtx.currentTime + 1.5);
-        }
-    } catch (e) {
-        console.warn("Failed to initialize Web Audio API", e);
-    }
+    } catch(e) { console.warn('Audio init failed', e); }
 }
 
-function toggleAudio() {
-    isMuted = !isMuted;
-    
-    if (!audioCtx) {
-        initAudio();
-    }
-    
-    if (isMuted) {
-        btnToggleAudio.textContent = '🔇 Sound: Off';
-        btnToggleAudio.classList.remove('active');
-        if (ambientGain) {
-            ambientGain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + 0.3);
-        }
-    } else {
-        btnToggleAudio.textContent = '🔊 Sound: On';
-        btnToggleAudio.classList.add('active');
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
-        if (ambientGain) {
-            ambientGain.gain.linearRampToValueAtTime(0.04, audioCtx.currentTime + 0.5);
-        }
-    }
+function setAmbient(on) {
+    if (!audioCtx || !ambientGain) return;
+    const target = on ? 0.045 : 0;
+    ambientGain.gain.linearRampToValueAtTime(target, audioCtx.currentTime + 0.6);
 }
 
 function playLaunchSound() {
     if (!audioCtx || isMuted) return;
-    
     try {
-        const osc = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-        
+        const osc  = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(120, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(650, audioCtx.currentTime + 0.3);
-        
-        gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
-        
-        osc.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        
+        osc.frequency.setValueAtTime(110, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(700, audioCtx.currentTime + 0.28);
+        gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.35);
-    } catch (e) {}
+        osc.stop(audioCtx.currentTime + 0.32);
+    } catch(e) {}
 }
 
-function playCollisionSound() {
+function playBoomSound() {
     if (!audioCtx || isMuted) return;
-    
     try {
-        // Noise blast synthesizer
-        const bufferSize = audioCtx.sampleRate * 1.2;
-        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-            data[i] = Math.random() * 2 - 1;
-        }
-        
-        const noiseNode = audioCtx.createBufferSource();
-        noiseNode.buffer = buffer;
-        
-        const filter = audioCtx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(350, audioCtx.currentTime);
-        filter.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.85);
-        
-        const gainNode = audioCtx.createGain();
-        gainNode.gain.setValueAtTime(0.35, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.85);
-        
-        noiseNode.connect(filter);
-        filter.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        
-        noiseNode.start();
-    } catch (e) {}
+        const bufSz = Math.floor(audioCtx.sampleRate * 1.0);
+        const buf   = audioCtx.createBuffer(1, bufSz, audioCtx.sampleRate);
+        const data  = buf.getChannelData(0);
+        for (let i = 0; i < bufSz; i++) data[i] = Math.random() * 2 - 1;
+
+        const noise  = audioCtx.createBufferSource();
+        noise.buffer = buf;
+        const filt   = audioCtx.createBiquadFilter();
+        filt.type    = 'lowpass';
+        filt.frequency.setValueAtTime(400, audioCtx.currentTime);
+        filt.frequency.exponentialRampToValueAtTime(20, audioCtx.currentTime + 0.8);
+        const gain   = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.38, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.85);
+        noise.connect(filt);
+        filt.connect(gain);
+        gain.connect(audioCtx.destination);
+        noise.start();
+    } catch(e) {}
 }
 
-// Background Twinkling Stars
+// ============================================================
+//  STARS
+// ============================================================
 function initStars() {
-    stars = [];
-    const starCount = 150;
-    for (let i = 0; i < starCount; i++) {
-        stars.push({
-            x: Math.random() * starsCanvas.width,
-            y: Math.random() * starsCanvas.height,
-            size: Math.random() * 1.5 + 0.5,
-            opacity: Math.random(),
-            twinkleSpeed: 0.005 + Math.random() * 0.015,
-            dx: (Math.random() - 0.5) * 0.05,
-            dy: (Math.random() - 0.5) * 0.05
-        });
-    }
+    stars = Array.from({ length: 160 }, () => ({
+        x:  Math.random() * starsCanvas.width,
+        y:  Math.random() * starsCanvas.height,
+        r:  Math.random() * 1.4 + 0.4,
+        op: Math.random(),
+        tw: 0.005 + Math.random() * 0.012,
+        dx: (Math.random() - 0.5) * 0.04,
+        dy: (Math.random() - 0.5) * 0.04,
+    }));
 }
 
 function drawStars() {
-    starsCtx.fillStyle = '#020208';
+    starsCtx.fillStyle = '#020209';
     starsCtx.fillRect(0, 0, starsCanvas.width, starsCanvas.height);
-
-    for (let star of stars) {
-        star.opacity += star.twinkleSpeed;
-        if (star.opacity > 1 || star.opacity < 0.1) {
-            star.twinkleSpeed = -star.twinkleSpeed;
-        }
-
-        star.x += star.dx;
-        star.y += star.dy;
-
-        if (star.x < 0) star.x = starsCanvas.width;
-        if (star.x > starsCanvas.width) star.x = 0;
-        if (star.y < 0) star.y = starsCanvas.height;
-        if (star.y > starsCanvas.height) star.y = 0;
-
-        starsCtx.fillStyle = `rgba(255, 255, 255, ${Math.abs(star.opacity)})`;
+    for (const s of stars) {
+        s.op += s.tw;
+        if (s.op > 1 || s.op < 0.08) s.tw *= -1;
+        s.x = (s.x + s.dx + starsCanvas.width)  % starsCanvas.width;
+        s.y = (s.y + s.dy + starsCanvas.height) % starsCanvas.height;
+        starsCtx.fillStyle = `rgba(255,255,255,${Math.abs(s.op).toFixed(2)})`;
         starsCtx.beginPath();
-        starsCtx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        starsCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
         starsCtx.fill();
     }
 }
 
-// Float Alerts
-function showAlert(message, type = 'warning') {
-    const bubble = document.createElement('div');
-    bubble.className = `alert-bubble alert-bubble-${type}`;
-    
-    let emoji = '⚠️';
-    if (type === 'success') emoji = '🚀';
-    if (type === 'danger') emoji = '💥';
-    
-    bubble.innerHTML = `<span>${emoji}</span> <span>${message}</span>`;
-    alertOverlay.appendChild(bubble);
-
-    setTimeout(() => {
-        bubble.remove();
-    }, 5000);
+// ============================================================
+//  ALERT BUBBLES
+// ============================================================
+function showAlert(msg, type = 'warning') {
+    const el = document.createElement('div');
+    el.className = `alert-bubble alert-bubble-${type}`;
+    const icon = type === 'danger' ? '💥' : type === 'success' ? '🚀' : '⚠️';
+    el.innerHTML = `<span>${icon}</span><span>${msg}</span>`;
+    alertOverlay.appendChild(el);
+    setTimeout(() => el.remove(), 5100);
 }
 
-// Orbit calculations
-function getCircularOrbitVelocity(r, M) {
+// ============================================================
+//  ORBIT MECHANICS
+// ============================================================
+function circularVelocity(r, M) {
     return Math.sqrt((G * M) / r);
 }
 
-// Reset/Initialize simulation
 function initPlanets() {
-    planets = [];
+    planets   = [];
     asteroids = [];
-    const sunMass = DEFAULT_SUN_MASS * sunMassMultiplier;
+    moon      = null;
+    customCount = 1;
 
-    // Load planets
-    planetTemplates.forEach(template => {
-        const r = template.distance;
-        const v = getCircularOrbitVelocity(r, sunMass);
+    const M = DEFAULT_SUN_MASS * sunMassMultiplier;
 
+    for (const t of PLANET_TEMPLATES) {
+        const v = circularVelocity(t.dist, M);
         planets.push({
-            id: template.id,
-            name: template.name,
-            x: r,
-            y: 0,
-            vx: 0,
-            vy: -v,
-            radius: template.radius,
-            color: template.color,
-            hasRings: template.hasRings || false,
-            trail: [],
-            status: 'stable',
-            hasMoon: template.hasMoon || false
+            id:       t.id,
+            name:     t.name,
+            x:        t.dist,
+            y:        0,
+            vx:       0,
+            vy:       -v,
+            radius:   t.r,
+            color:    t.color,
+            hasRings: !!t.hasRings,
+            trail:    [],
+            status:   'stable',
+            isCustom: false,
         });
-    });
+    }
 
-    // Initialize Moon
+    // Moon (relative to Earth)
     moon = {
-        rx: 16, // Relative distance offset from Earth
-        ry: 0,
-        rvx: 0,
-        rvy: -getCircularOrbitVelocity(16, EARTH_MASS_FOR_MOON),
-        radius: 1.5,
-        color: '#d3d3d3',
+        rx: 16, ry: 0,
+        rvx: 0, rvy: -circularVelocity(16, EARTH_MASS_MOON),
+        x: 135 + 16, y: 0,
+        radius: 1.8, color: '#cccccc',
         name: 'Moon',
         trail: [],
-        status: 'stable'
+        status: 'stable',
     };
 
-    // Load Asteroids (Orbiting in belt between Mars and Jupiter)
-    const asteroidCount = 150;
-    for (let i = 0; i < asteroidCount; i++) {
-        const r = 195 + Math.random() * 32;
+    // Asteroid belt (between Mars & Jupiter)
+    for (let i = 0; i < 160; i++) {
+        const r     = 196 + Math.random() * 34;
         const theta = Math.random() * Math.PI * 2;
-        const v = getCircularOrbitVelocity(r, sunMass);
-        
+        const v     = circularVelocity(r, M);
         asteroids.push({
-            x: r * Math.cos(theta),
-            y: r * Math.sin(theta),
+            x:  r * Math.cos(theta),
+            y:  r * Math.sin(theta),
             vx: -v * Math.sin(theta),
-            vy: v * Math.cos(theta),
-            radius: 0.8 + Math.random() * 0.9,
-            color: 'rgba(160, 160, 180, 0.55)'
+            vy:  v * Math.cos(theta),
+            r:   0.7 + Math.random() * 0.9,
+            alive: true,
         });
     }
 }
 
-// UI Event Listeners
-sunMassSlider.addEventListener('input', (e) => {
+// ============================================================
+//  UI EVENT HANDLERS
+// ============================================================
+
+// --- Sliders ---
+sunMassSlider.addEventListener('input', e => {
     sunMassMultiplier = parseFloat(e.target.value);
-    sunMassValue.textContent = `${sunMassMultiplier.toFixed(2)}x`;
-    sun.mass = DEFAULT_SUN_MASS * sunMassMultiplier;
+    sunMassValue.textContent = `${sunMassMultiplier.toFixed(2)}×`;
+    sun.mass   = DEFAULT_SUN_MASS  * sunMassMultiplier;
     sun.radius = DEFAULT_SUN_RADIUS * Math.max(0.4, Math.cbrt(sunMassMultiplier));
 });
 
-simSpeedSlider.addEventListener('input', (e) => {
+simSpeedSlider.addEventListener('input', e => {
     simSpeed = parseFloat(e.target.value);
-    simSpeedValue.textContent = `${simSpeed.toFixed(1)}x`;
+    simSpeedValue.textContent = `${simSpeed.toFixed(1)}×`;
 });
 
+// --- Play/Pause ---
 btnPlayPause.addEventListener('click', () => {
     isPaused = !isPaused;
-    btnPlayPause.textContent = isPaused ? 'Resume Sim' : 'Pause Sim';
-    btnPlayPause.style.background = isPaused 
-        ? 'linear-gradient(135deg, #00b4d8, #0077b6)' 
-        : 'linear-gradient(135deg, var(--primary-color), #b5179e)';
+    btnPlayPause.textContent      = isPaused ? '▶' : '⏸';
+    btnPlayPause.title            = isPaused ? 'Resume' : 'Pause';
+    btnPlayPause.style.background = isPaused
+        ? 'linear-gradient(135deg,#00b4d8,#0077b6)'
+        : '';
 });
 
+// --- Reset ---
 btnReset.addEventListener('click', () => {
     sunMassMultiplier = 1.0;
-    sunMassSlider.value = 1.0;
-    sunMassValue.textContent = '1.00x';
-    sun.mass = DEFAULT_SUN_MASS;
+    sunMassSlider.value = '1.0';
+    sunMassValue.textContent = '1.00×';
+    sun.mass   = DEFAULT_SUN_MASS;
     sun.radius = DEFAULT_SUN_RADIUS;
 
     simSpeed = 1.0;
-    simSpeedSlider.value = 1.0;
-    simSpeedValue.textContent = '1.0x';
+    simSpeedSlider.value = '1.0';
+    simSpeedValue.textContent = '1.0×';
 
     isPaused = false;
-    btnPlayPause.textContent = 'Pause Sim';
-    btnPlayPause.style.background = 'linear-gradient(135deg, var(--primary-color), #b5179e)';
+    btnPlayPause.textContent = '⏸';
+    btnPlayPause.style.background = '';
 
-    offsetX = 0;
-    offsetY = 0;
-    zoom = 0.95;
-    
-    customPlanetsCount = 1;
+    offsetX = 0; offsetY = 0; zoom = 0.9;
     initPlanets();
     showAlert('Solar System reset to stable configuration.', 'success');
 });
 
+// --- Clear Trails ---
 btnClearTrails.addEventListener('click', () => {
     planets.forEach(p => p.trail = []);
     if (moon) moon.trail = [];
 });
 
-btnToggleAudio.addEventListener('click', toggleAudio);
-
-// Presets
-Object.keys(presets).forEach(presetId => {
-    const btn = document.getElementById(presetId);
-    if (btn) {
-        btn.addEventListener('click', () => {
-            const val = presets[presetId];
-            sunMassSlider.value = val;
-            sunMassSlider.dispatchEvent(new Event('input'));
-            showAlert(`Solar Mass set to ${val}x.`, 'info');
-        });
-    }
+// --- Audio ---
+btnToggleAudio.addEventListener('click', () => {
+    if (!audioCtx) initAudio();
+    isMuted = !isMuted;
+    if (!isMuted && audioCtx?.state === 'suspended') audioCtx.resume();
+    setAmbient(!isMuted);
+    btnToggleAudio.textContent = isMuted ? '🔇' : '🔊';
+    btnToggleAudio.title       = isMuted ? 'Unmute' : 'Mute';
+    btnToggleAudio.classList.toggle('tool-btn-primary', !isMuted);
 });
 
-// Mode Toggles
+// --- Panel toggle ---
+function showPanel() {
+    mainPanel.classList.remove('hidden');
+}
+function hidePanel() {
+    mainPanel.classList.add('hidden');
+}
+
+btnTogglePanel.addEventListener('click', () => {
+    mainPanel.classList.toggle('hidden');
+});
+
+btnClosePanel.addEventListener('click', hidePanel);
+
+// --- Hint dismiss ---
+btnDismissHint.addEventListener('click', () => {
+    hintBar.classList.add('hidden');
+});
+
+// --- Presets ---
+document.querySelectorAll('[data-mass]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const val = parseFloat(btn.dataset.mass);
+        sunMassSlider.value = val;
+        sunMassSlider.dispatchEvent(new Event('input'));
+        showAlert(`Solar mass set to ${val}×`, 'success');
+    });
+});
+
+// --- Mode Toggles ---
 modePan.addEventListener('click', () => {
     activeMode = 'pan';
     modePan.classList.add('active');
     modeLaunch.classList.remove('active');
-    isDrawingSlingshot = false;
+    isSlingshot = false;
+    simCanvas.style.cursor = 'grab';
 });
 
 modeLaunch.addEventListener('click', () => {
     activeMode = 'launch';
     modeLaunch.classList.add('active');
     modePan.classList.remove('active');
+    simCanvas.style.cursor = 'crosshair';
 });
 
-// Mobile settings overlay toggle
-dashboardToggle.addEventListener('click', () => {
-    mainDashboard.classList.toggle('collapsed');
-});
-
-// Convert Screen coordinates to World coordinates
-function getSimCoordinates(clientX, clientY) {
-    const rect = simCanvas.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
+// ============================================================
+//  COORDINATE CONVERSION
+// ============================================================
+function screenToWorld(cx, cy) {
     return {
-        x: (x - simCanvas.width / 2 - offsetX) / zoom,
-        y: (y - simCanvas.height / 2 - offsetY) / zoom
+        x: (cx - simCanvas.width  / 2 - offsetX) / zoom,
+        y: (cy - simCanvas.height / 2 - offsetY) / zoom,
     };
 }
 
-// Mouse / Touch Interaction Controls
-function handleStart(clientX, clientY) {
-    // If clicking the dashboard controls, ignore
-    if (mainDashboard.contains(document.elementFromPoint(clientX, clientY)) ||
-        dashboardToggle.contains(document.elementFromPoint(clientX, clientY))) {
-        return;
-    }
+// ============================================================
+//  POINTER INTERACTION (Mouse + Touch unified)
+// ============================================================
 
-    if (!audioCtx) {
-        initAudio(); // Initialize audio on first click
-    }
+// Ignore clicks that land on UI elements
+function isOnUI(cx, cy) {
+    const el = document.elementFromPoint(cx, cy);
+    return el && (
+        el.closest('.panel')   !== null ||
+        el.closest('.toolbar') !== null ||
+        el.closest('.hint-bar') !== null
+    );
+}
+
+function handlePointerDown(cx, cy) {
+    if (isOnUI(cx, cy)) return;
+
+    // Wake audio on first interaction
+    if (!audioCtx) initAudio();
+    if (audioCtx?.state === 'suspended') audioCtx.resume();
 
     if (activeMode === 'pan') {
         isDragging = true;
-        startDragX = clientX - offsetX;
-        startDragY = clientY - offsetY;
-    } else if (activeMode === 'launch') {
-        isDrawingSlingshot = true;
-        slingshotStart = { x: clientX, y: clientY };
-        slingshotEnd = { x: clientX, y: clientY };
+        startDragX = cx - offsetX;
+        startDragY = cy - offsetY;
+    } else {
+        isSlingshot    = true;
+        slingshotStart = { x: cx, y: cy };
+        slingshotEnd   = { x: cx, y: cy };
     }
 }
 
-function handleMove(clientX, clientY) {
-    if (isDragging && activeMode === 'pan') {
-        offsetX = clientX - startDragX;
-        offsetY = clientY - startDragY;
-    } else if (isDrawingSlingshot && activeMode === 'launch') {
-        slingshotEnd = { x: clientX, y: clientY };
-    }
+function handlePointerMove(cx, cy) {
+    if (isDragging)   { offsetX = cx - startDragX; offsetY = cy - startDragY; }
+    if (isSlingshot)  { slingshotEnd = { x: cx, y: cy }; }
 }
 
-function handleEnd() {
-    if (isDragging) {
-        isDragging = false;
-    }
+function handlePointerUp() {
+    isDragging = false;
 
-    if (isDrawingSlingshot) {
-        isDrawingSlingshot = false;
-        
-        const dx = slingshotStart.x - slingshotEnd.x;
-        const dy = slingshotStart.y - slingshotEnd.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+    if (isSlingshot) {
+        isSlingshot = false;
 
-        // Only launch if user dragged enough to create a velocity vector
-        if (dist > 12) {
-            const worldCoords = getSimCoordinates(slingshotStart.x, slingshotStart.y);
-            
-            // Scaled launcher force
-            const speedMultiplier = 0.045 / zoom;
-            const vx = dx * speedMultiplier;
-            const vy = dy * speedMultiplier;
+        const dx   = slingshotStart.x - slingshotEnd.x;
+        const dy   = slingshotStart.y - slingshotEnd.y;
+        const dist = Math.hypot(dx, dy);
 
-            const size = 4.5 + Math.random() * 5.0;
-            const hue = Math.floor(Math.random() * 360);
-            
-            const customPlanet = {
-                id: `custom_${Date.now()}`,
-                name: `Custom #${customPlanetsCount++}`,
-                x: worldCoords.x,
-                y: worldCoords.y,
-                vx: vx,
-                vy: vy,
-                radius: size,
-                color: `hsl(${hue}, 85%, 65%)`,
-                trail: [],
-                status: 'stable',
-                isCustom: true
-            };
+        if (dist > 14) {
+            const w    = screenToWorld(slingshotStart.x, slingshotStart.y);
+            const spd  = 0.045 / zoom;
+            const hue  = Math.floor(Math.random() * 360);
+            const size = 4.5 + Math.random() * 5;
 
-            planets.push(customPlanet);
+            planets.push({
+                id:       `custom_${Date.now()}`,
+                name:     `Custom #${customCount++}`,
+                x:        w.x,
+                y:        w.y,
+                vx:       dx * spd,
+                vy:       dy * spd,
+                radius:   size,
+                color:    `hsl(${hue},85%,65%)`,
+                hasRings: false,
+                trail:    [],
+                status:   'stable',
+                isCustom: true,
+            });
+
             playLaunchSound();
-            showAlert(`Launched ${customPlanet.name}!`, 'success');
+            showAlert(`Custom Planet #${customCount - 1} launched!`, 'success');
         }
     }
 }
 
-// Mouse Listeners
-simCanvas.addEventListener('mousedown', (e) => {
-    if (e.button === 0) { // Left click
-        handleStart(e.clientX, e.clientY);
-    } else if (e.button === 1 || e.button === 2) { // Middle or Right click to Pan override
-        isDragging = true;
-        startDragX = e.clientX - offsetX;
-        startDragY = e.clientY - offsetY;
-    }
+// ---- Mouse events ----
+simCanvas.addEventListener('mousedown', e => {
+    if (e.button === 0) handlePointerDown(e.clientX, e.clientY);
 });
+window.addEventListener('mousemove', e => handlePointerMove(e.clientX, e.clientY));
+window.addEventListener('mouseup',   () => handlePointerUp());
 
-window.addEventListener('mousemove', (e) => {
-    handleMove(e.clientX, e.clientY);
-});
-
-window.addEventListener('mouseup', handleEnd);
-
-// Touch Listeners (Mobile Panning & Slingshot)
-let touchStartDist = 0;
-let initialTouchZoom = 1.0;
-let initialTouchOffset = { x: 0, y: 0 };
-
-simCanvas.addEventListener('touchstart', (e) => {
-    if (e.touches.length === 1) {
-        // Single finger handles Launcher or Panning
-        handleStart(e.touches[0].clientX, e.touches[0].clientY);
-    } else if (e.touches.length === 2) {
-        // Two fingers handles Pinch Zooming & Panning
-        isDrawingSlingshot = false; // Cancel launch
-        isDragging = false;
-        
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        touchStartDist = Math.sqrt(dx * dx + dy * dy);
-        
-        initialTouchZoom = zoom;
-        initialTouchOffset = { x: offsetX, y: offsetY };
-        
-        startDragX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - offsetX;
-        startDragY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - offsetY;
-    }
-});
-
-simCanvas.addEventListener('touchmove', (e) => {
-    if (e.touches.length === 1) {
-        handleMove(e.touches[0].clientX, e.touches[0].clientY);
-    } else if (e.touches.length === 2) {
-        // Two finger pinch to zoom
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        const ratio = dist / touchStartDist;
-        zoom = Math.max(0.15, Math.min(initialTouchZoom * ratio, 5.0));
-
-        // Two finger drag to pan
-        const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-        const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-        offsetX = centerX - startDragX;
-        offsetY = centerY - startDragY;
-    }
-});
-
-simCanvas.addEventListener('touchend', handleEnd);
-
-// Wheel Zoom
-simCanvas.addEventListener('wheel', (e) => {
+simCanvas.addEventListener('wheel', e => {
     e.preventDefault();
-    const zoomIntensity = 0.06;
-    const mouseX = e.clientX - simCanvas.width / 2;
-    const mouseY = e.clientY - simCanvas.height / 2;
+    const factor = e.deltaY < 0 ? 1.07 : 0.93;
+    const mx = e.clientX - simCanvas.width  / 2;
+    const my = e.clientY - simCanvas.height / 2;
+    const old = zoom;
+    zoom = Math.max(0.15, Math.min(zoom * factor, 5.5));
+    offsetX -= mx / old - mx / zoom;
+    offsetY -= my / old - my / zoom;
+}, { passive: false });
 
-    const oldZoom = zoom;
-    if (e.deltaY < 0) {
-        zoom = Math.min(zoom * (1 + zoomIntensity), 5.0);
-    } else {
-        zoom = Math.max(zoom * (1 - zoomIntensity), 0.15);
-    }
-
-    offsetX -= mouseX / oldZoom - mouseX / zoom;
-    offsetY -= mouseY / oldZoom - mouseY / zoom;
-});
-
-// Disable Right-Click Menu on Canvas to allow right-click panning
 simCanvas.addEventListener('contextmenu', e => e.preventDefault());
 
-// Window resize
+// ---- Touch events (mobile-optimized) ----
+simCanvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+
+    if (e.touches.length === 1) {
+        const t = e.touches[0];
+        if (!isOnUI(t.clientX, t.clientY)) {
+            handlePointerDown(t.clientX, t.clientY);
+        }
+    } else if (e.touches.length === 2) {
+        // Two-finger: cancel any single-finger action and start pinch
+        isDragging  = false;
+        isSlingshot = false;
+
+        const t0 = e.touches[0], t1 = e.touches[1];
+        lastTouchDist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+        lastTouchZoom = zoom;
+        lastTouchOffX = offsetX;
+        lastTouchOffY = offsetY;
+        lastTouchMidX = (t0.clientX + t1.clientX) / 2;
+        lastTouchMidY = (t0.clientY + t1.clientY) / 2;
+    }
+}, { passive: false });
+
+simCanvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+
+    if (e.touches.length === 1 && !isSlingshot && !isDragging) return;
+
+    if (e.touches.length === 1) {
+        const t = e.touches[0];
+        handlePointerMove(t.clientX, t.clientY);
+    } else if (e.touches.length === 2) {
+        const t0 = e.touches[0], t1 = e.touches[1];
+        const newDist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+        const midX    = (t0.clientX + t1.clientX) / 2;
+        const midY    = (t0.clientY + t1.clientY) / 2;
+
+        // Pinch zoom
+        const scale = newDist / lastTouchDist;
+        const oldZ  = zoom;
+        zoom = Math.max(0.15, Math.min(lastTouchZoom * scale, 5.5));
+
+        // Pinch pan
+        const dmx = midX - lastTouchMidX;
+        const dmy = midY - lastTouchMidY;
+        offsetX = lastTouchOffX + dmx + (midX - simCanvas.width / 2) * (1 / oldZ - 1 / zoom);
+        offsetY = lastTouchOffY + dmy + (midY - simCanvas.height / 2) * (1 / oldZ - 1 / zoom);
+    }
+}, { passive: false });
+
+simCanvas.addEventListener('touchend', e => {
+    e.preventDefault();
+    if (e.touches.length === 0) handlePointerUp();
+}, { passive: false });
+
+// ============================================================
+//  RESIZE
+// ============================================================
 function resizeCanvases() {
-    starsCanvas.width = window.innerWidth;
-    starsCanvas.height = window.innerHeight;
-    simCanvas.width = window.innerWidth;
-    simCanvas.height = window.innerHeight;
+    starsCanvas.width  = simCanvas.width  = window.innerWidth;
+    starsCanvas.height = simCanvas.height = window.innerHeight;
     initStars();
 }
-
 window.addEventListener('resize', resizeCanvases);
 
-// Physics Engine Updates
-let frameCounter = 0;
+// ============================================================
+//  PHYSICS UPDATE
+// ============================================================
+let frame = 0;
 
 function updatePhysics() {
     if (isPaused) return;
+    const STEPS = 4;
+    const dt    = (0.12 * simSpeed) / STEPS;
 
-    const substeps = 4;
-    const dt = (0.12 * simSpeed) / substeps;
+    for (let step = 0; step < STEPS; step++) {
 
-    for (let step = 0; step < substeps; step++) {
-        // 1. Update Planets
-        planets.forEach(planet => {
-            if (planet.status !== 'stable') return;
+        // ---- Planets ----
+        for (const p of planets) {
+            if (p.status !== 'stable') continue;
+            const dx = sun.x - p.x, dy = sun.y - p.y;
+            const r  = Math.hypot(dx, dy);
 
-            const dx = sun.x - planet.x;
-            const dy = sun.y - planet.y;
-            const r = Math.sqrt(dx * dx + dy * dy);
-
-            // Crash detection
-            if (r < sun.radius + planet.radius) {
-                planet.status = 'collided';
-                planet.vx = 0;
-                planet.vy = 0;
-                playCollisionSound();
-                showAlert(`${planet.name} collided with the Sun and was incinerated!`, 'danger');
-                return;
+            if (r < sun.radius + p.radius) {
+                p.status = 'collided'; p.vx = p.vy = 0;
+                playBoomSound();
+                showAlert(`${p.name} was incinerated by the Sun!`, 'danger');
+                continue;
             }
-
-            // Escape detection
-            if (r > 2000) {
-                planet.status = 'escaped';
-                showAlert(`${planet.name} escaped the solar gravity into deep space!`, 'warning');
-                return;
+            if (r > 2200) {
+                p.status = 'escaped';
+                showAlert(`${p.name} escaped into deep space!`, 'warning');
+                continue;
             }
+            const a = (G * sun.mass) / (r * r);
+            p.vx += a * (dx / r) * dt;
+            p.vy += a * (dy / r) * dt;
+            p.x  += p.vx * dt;
+            p.y  += p.vy * dt;
+        }
 
-            // Newtonian gravity
-            const force = (G * sun.mass) / (r * r);
-            planet.vx += force * (dx / r) * dt;
-            planet.vy += force * (dy / r) * dt;
-            planet.x += planet.vx * dt;
-            planet.y += planet.vy * dt;
-        });
-
-        // 2. Update Earth's Moon (relative orbit simulation)
+        // ---- Moon ----
         if (moon && moon.status === 'stable') {
             const earth = planets.find(p => p.id === 'earth');
-            
             if (earth && earth.status === 'stable') {
-                // Gravity on moon from Earth
-                const mr = Math.sqrt(moon.rx * moon.rx + moon.ry * moon.ry);
-                
+                const mr = Math.hypot(moon.rx, moon.ry);
                 if (mr < earth.radius + moon.radius) {
                     moon.status = 'collided';
-                    playCollisionSound();
-                    showAlert(`The Moon crashed into the Earth!`, 'danger');
+                    playBoomSound();
+                    showAlert('The Moon crashed into Earth!', 'danger');
                 } else {
-                    const localForce = (G * EARTH_MASS_FOR_MOON) / (mr * mr);
-                    
-                    moon.rvx -= localForce * (moon.rx / mr) * dt;
-                    moon.rvy -= localForce * (moon.ry / mr) * dt;
-                    
-                    moon.rx += moon.rvx * dt;
-                    moon.ry += moon.rvy * dt;
-
-                    // Absolute coordinates
-                    moon.x = earth.x + moon.rx;
-                    moon.y = earth.y + moon.ry;
-                }
-            } else {
-                // If Earth is destroyed or escaped, the Moon is pulled by the Sun's gravity directly
-                const dx = sun.x - moon.x;
-                const dy = sun.y - moon.y;
-                const r = Math.sqrt(dx * dx + dy * dy);
-
-                if (r < sun.radius + moon.radius) {
-                    moon.status = 'collided';
-                    playCollisionSound();
-                    showAlert(`The Moon crashed into the Sun!`, 'danger');
-                } else if (r > 2000) {
-                    moon.status = 'escaped';
-                } else {
-                    const force = (G * sun.mass) / (r * r);
-                    const absoluteVx = (earth ? earth.vx : 0) + moon.rvx;
-                    const absoluteVy = (earth ? earth.vy : 0) + moon.rvy;
-                    
-                    const ax = force * (dx / r);
-                    const ay = force * (dy / r);
-
-                    const newAbsoluteVx = absoluteVx + ax * dt;
-                    const newAbsoluteVy = absoluteVy + ay * dt;
-
-                    moon.x += newAbsoluteVx * dt;
-                    moon.y += newAbsoluteVy * dt;
-
-                    // Store speed back into relative space just to keep properties
-                    moon.rvx = newAbsoluteVx;
-                    moon.rvy = newAbsoluteVy;
+                    const a = (G * EARTH_MASS_MOON) / (mr * mr);
+                    moon.rvx -= a * (moon.rx / mr) * dt;
+                    moon.rvy -= a * (moon.ry / mr) * dt;
+                    moon.rx  += moon.rvx * dt;
+                    moon.ry  += moon.rvy * dt;
+                    moon.x    = earth.x + moon.rx;
+                    moon.y    = earth.y + moon.ry;
                 }
             }
         }
 
-        // 3. Update Asteroid Belt Particles
-        asteroids.forEach(ast => {
-            const dx = sun.x - ast.x;
-            const dy = sun.y - ast.y;
-            const r = Math.sqrt(dx * dx + dy * dy);
-            
-            if (r < sun.radius) {
-                // Disappear into Sun
-                ast.x = 999999;
-                ast.y = 999999;
-                return;
-            }
-
-            const force = (G * sun.mass) / (r * r);
-            ast.vx += force * (dx / r) * dt;
-            ast.vy += force * (dy / r) * dt;
-            ast.x += ast.vx * dt;
-            ast.y += ast.vy * dt;
-        });
+        // ---- Asteroids ----
+        for (const a of asteroids) {
+            if (!a.alive) continue;
+            const dx = sun.x - a.x, dy = sun.y - a.y;
+            const r  = Math.hypot(dx, dy);
+            if (r < sun.radius) { a.alive = false; continue; }
+            const f  = (G * sun.mass) / (r * r);
+            a.vx += f * (dx / r) * dt;
+            a.vy += f * (dy / r) * dt;
+            a.x  += a.vx * dt;
+            a.y  += a.vy * dt;
+        }
     }
 
-    // Add Trails periodically
-    if (frameCounter % 2 === 0) {
-        planets.forEach(planet => {
-            if (planet.status === 'stable') {
-                planet.trail.push({ x: planet.x, y: planet.y });
-                if (planet.trail.length > 350) planet.trail.shift();
-            }
-        });
-
+    // ---- Trails (every 2nd frame) ----
+    if (frame % 2 === 0) {
+        for (const p of planets) {
+            if (p.status !== 'stable') continue;
+            p.trail.push({ x: p.x, y: p.y });
+            if (p.trail.length > 380) p.trail.shift();
+        }
         if (moon && moon.status === 'stable') {
             moon.trail.push({ x: moon.x, y: moon.y });
-            if (moon.trail.length > 150) moon.trail.shift();
+            if (moon.trail.length > 160) moon.trail.shift();
         }
     }
 }
 
-// Rendering
+// ============================================================
+//  RENDERING
+// ============================================================
 function drawSimulation() {
     simCtx.clearRect(0, 0, simCanvas.width, simCanvas.height);
     drawStars();
@@ -760,254 +649,220 @@ function drawSimulation() {
     simCtx.translate(simCanvas.width / 2 + offsetX, simCanvas.height / 2 + offsetY);
     simCtx.scale(zoom, zoom);
 
-    // 1. Draw Planet Trails
-    planets.forEach(planet => {
-        if (planet.trail.length < 2) return;
-
+    // 1. Planet trails
+    for (const p of planets) {
+        if (p.trail.length < 2) continue;
         simCtx.beginPath();
-        simCtx.moveTo(planet.trail[0].x, planet.trail[0].y);
-        for (let i = 1; i < planet.trail.length; i++) {
-            simCtx.lineTo(planet.trail[i].x, planet.trail[i].y);
-        }
-        
-        simCtx.strokeStyle = planet.color;
-        simCtx.lineWidth = 1.2 / zoom;
-        simCtx.globalAlpha = 0.35;
+        simCtx.moveTo(p.trail[0].x, p.trail[0].y);
+        for (let i = 1; i < p.trail.length; i++) simCtx.lineTo(p.trail[i].x, p.trail[i].y);
+        simCtx.strokeStyle = p.color;
+        simCtx.lineWidth   = 1.2 / zoom;
+        simCtx.globalAlpha = 0.32;
         simCtx.stroke();
-        simCtx.globalAlpha = 1.0;
-    });
+        simCtx.globalAlpha = 1;
+    }
 
-    // 2. Draw Moon Trail
+    // 2. Moon trail
     if (moon && moon.trail.length >= 2 && moon.status === 'stable') {
         simCtx.beginPath();
         simCtx.moveTo(moon.trail[0].x, moon.trail[0].y);
-        for (let i = 1; i < moon.trail.length; i++) {
-            simCtx.lineTo(moon.trail[i].x, moon.trail[i].y);
-        }
-        simCtx.strokeStyle = 'rgba(211, 211, 211, 0.45)';
-        simCtx.lineWidth = 0.8 / zoom;
+        for (let i = 1; i < moon.trail.length; i++) simCtx.lineTo(moon.trail[i].x, moon.trail[i].y);
+        simCtx.strokeStyle = 'rgba(200,200,220,0.4)';
+        simCtx.lineWidth   = 0.8 / zoom;
         simCtx.stroke();
     }
 
-    // 3. Draw Asteroids
-    simCtx.fillStyle = 'rgba(175, 175, 195, 0.65)';
-    asteroids.forEach(ast => {
-        if (ast.x > 5000) return; // ignore destroyed ones
+    // 3. Asteroids
+    simCtx.fillStyle = 'rgba(170,170,190,0.6)';
+    for (const a of asteroids) {
+        if (!a.alive) continue;
         simCtx.beginPath();
-        simCtx.arc(ast.x, ast.y, ast.radius, 0, Math.PI * 2);
+        simCtx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
         simCtx.fill();
-    });
+    }
 
-    // 4. Draw Sun
+    // 4. Sun
     if (sunMassMultiplier > 0) {
+        const pulse = sun.radius * (1.55 + Math.sin(Date.now() / 190) * 0.05);
+        const grad  = simCtx.createRadialGradient(0, 0, sun.radius * 0.45, 0, 0, pulse);
+        grad.addColorStop(0,   '#ffffff');
+        grad.addColorStop(0.2, '#ffe000');
+        grad.addColorStop(0.6, '#ff6200');
+        grad.addColorStop(1,   'rgba(255,60,0,0)');
         simCtx.save();
         simCtx.beginPath();
-        simCtx.arc(sun.x, sun.y, sun.radius, 0, Math.PI * 2);
-
-        const glowRadius = sun.radius * (1.55 + Math.sin(Date.now() / 180) * 0.05);
-        const grad = simCtx.createRadialGradient(sun.x, sun.y, sun.radius * 0.5, sun.x, sun.y, glowRadius);
-        grad.addColorStop(0, '#ffffff');
-        grad.addColorStop(0.18, '#ffea00');
-        grad.addColorStop(0.58, '#ff6700');
-        grad.addColorStop(1, 'rgba(255, 60, 0, 0)');
-        
-        simCtx.fillStyle = grad;
-        simCtx.shadowBlur = 25 * zoom;
-        simCtx.shadowColor = '#ff6700';
+        simCtx.arc(0, 0, pulse, 0, Math.PI * 2);
+        simCtx.fillStyle   = grad;
+        simCtx.shadowBlur  = 30 * zoom;
+        simCtx.shadowColor = '#ff6200';
         simCtx.fill();
         simCtx.restore();
     } else {
-        // Dead dwarf core
+        // Dead star
         simCtx.beginPath();
-        simCtx.arc(sun.x, sun.y, sun.radius, 0, Math.PI * 2);
-        simCtx.fillStyle = '#202028';
-        simCtx.strokeStyle = '#404050';
-        simCtx.lineWidth = 2;
-        simCtx.stroke();
+        simCtx.arc(0, 0, sun.radius, 0, Math.PI * 2);
+        simCtx.fillStyle = '#1a1a22';
         simCtx.fill();
+        simCtx.strokeStyle = '#383848';
+        simCtx.lineWidth   = 2;
+        simCtx.stroke();
     }
 
-    // 5. Draw Planets
-    planets.forEach(planet => {
-        if (planet.status !== 'stable') return;
-
+    // 5. Planets
+    for (const p of planets) {
+        if (p.status !== 'stable') continue;
         simCtx.save();
-        
-        const dx = planet.x - sun.x;
-        const dy = planet.y - sun.y;
-        const angle = Math.atan2(dy, dx);
 
-        // Draw Rings (Saturn)
-        if (planet.hasRings) {
+        // Saturn's rings
+        if (p.hasRings) {
             simCtx.save();
-            simCtx.translate(planet.x, planet.y);
-            simCtx.rotate(0.25);
+            simCtx.translate(p.x, p.y);
+            simCtx.rotate(0.26);
             simCtx.beginPath();
-            simCtx.ellipse(0, 0, planet.radius * 2.0, planet.radius * 0.6, 0, 0, Math.PI * 2);
-            simCtx.strokeStyle = 'rgba(237, 220, 210, 0.45)';
-            simCtx.lineWidth = 3.5 / zoom;
+            simCtx.ellipse(0, 0, p.radius * 2.0, p.radius * 0.58, 0, 0, Math.PI * 2);
+            simCtx.strokeStyle = 'rgba(237,220,210,0.45)';
+            simCtx.lineWidth   = 3.5 / zoom;
             simCtx.stroke();
             simCtx.restore();
         }
 
-        // Draw Planet Body
-        simCtx.beginPath();
-        simCtx.arc(planet.x, planet.y, planet.radius, 0, Math.PI * 2);
-        
-        const planetGrad = simCtx.createRadialGradient(
-            planet.x - (planet.radius * 0.3) * Math.cos(angle),
-            planet.y - (planet.radius * 0.3) * Math.sin(angle),
-            planet.radius * 0.1,
-            planet.x,
-            planet.y,
-            planet.radius
-        );
-        planetGrad.addColorStop(0, '#ffffff');
-        planetGrad.addColorStop(0.35, planet.color);
-        planetGrad.addColorStop(1, '#020208');
+        // Sphere shading
+        const ang  = Math.atan2(p.y - sun.y, p.x - sun.x);
+        const gx   = p.x - Math.cos(ang) * p.radius * 0.32;
+        const gy   = p.y - Math.sin(ang) * p.radius * 0.32;
+        const grad = simCtx.createRadialGradient(gx, gy, p.radius * 0.08, p.x, p.y, p.radius);
+        grad.addColorStop(0,   '#ffffff');
+        grad.addColorStop(0.4, p.color);
+        grad.addColorStop(1,   '#010105');
 
-        simCtx.fillStyle = planetGrad;
-        simCtx.shadowBlur = 4 * zoom;
-        simCtx.shadowColor = planet.color;
+        simCtx.beginPath();
+        simCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        simCtx.fillStyle   = grad;
+        simCtx.shadowBlur  = 5 * zoom;
+        simCtx.shadowColor = p.color;
         simCtx.fill();
 
-        // Planet Label
+        // Label
         simCtx.shadowBlur = 0;
-        simCtx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-        simCtx.font = `600 ${Math.max(10, 11 / zoom)}px Outfit`;
-        simCtx.textAlign = 'center';
-        simCtx.fillText(planet.name, planet.x, planet.y - planet.radius - 6);
+        simCtx.fillStyle  = 'rgba(255,255,255,0.72)';
+        simCtx.font       = `600 ${Math.max(10, 11 / zoom)}px Outfit`;
+        simCtx.textAlign  = 'center';
+        simCtx.fillText(p.name, p.x, p.y - p.radius - 5);
 
         simCtx.restore();
-    });
+    }
 
-    // 6. Draw Moon
+    // 6. Moon
     if (moon && moon.status === 'stable') {
         const earth = planets.find(p => p.id === 'earth');
         if (earth && earth.status === 'stable') {
             simCtx.save();
             simCtx.beginPath();
             simCtx.arc(moon.x, moon.y, moon.radius, 0, Math.PI * 2);
-            simCtx.fillStyle = moon.color;
-            simCtx.shadowBlur = 3 * zoom;
-            simCtx.shadowColor = '#ffffff';
+            simCtx.fillStyle   = moon.color;
+            simCtx.shadowBlur  = 4 * zoom;
+            simCtx.shadowColor = '#cccccc';
             simCtx.fill();
             simCtx.restore();
         }
     }
 
-    // 7. Draw Drag slingshot indicator
-    if (isDrawingSlingshot && activeMode === 'launch') {
-        simCtx.restore(); // Restore translate state to draw absolute lines in screen coordinates
-        
-        // Draw dotted slingshot line
-        simCtx.beginPath();
-        simCtx.setLineDash([5, 5]);
-        simCtx.moveTo(slingshotStart.x, slingshotStart.y);
-        simCtx.lineTo(slingshotEnd.x, slingshotEnd.y);
-        simCtx.strokeStyle = 'rgba(0, 255, 136, 0.8)';
-        simCtx.lineWidth = 2.5;
-        simCtx.stroke();
-        simCtx.setLineDash([]); // Reset dash
+    simCtx.restore(); // ← end world transform
 
-        // Draw slingshot origin circle
-        simCtx.beginPath();
-        simCtx.arc(slingshotStart.x, slingshotStart.y, 6, 0, Math.PI * 2);
-        simCtx.fillStyle = '#00ff88';
-        simCtx.fill();
-
-        // Draw slingshot reticle
-        simCtx.beginPath();
-        simCtx.arc(slingshotEnd.x, slingshotEnd.y, 4, 0, Math.PI * 2);
-        simCtx.fillStyle = '#ff3366';
-        simCtx.fill();
+    // 7. Slingshot indicator (screen-space, no world transform)
+    if (isSlingshot && activeMode === 'launch') {
+        const sx = slingshotStart.x, sy = slingshotStart.y;
+        const ex = slingshotEnd.x,   ey = slingshotEnd.y;
 
         simCtx.save();
-        simCtx.translate(simCanvas.width / 2 + offsetX, simCanvas.height / 2 + offsetY);
-        simCtx.scale(zoom, zoom);
-    }
+        simCtx.setLineDash([5, 5]);
+        simCtx.beginPath();
+        simCtx.moveTo(sx, sy);
+        simCtx.lineTo(ex, ey);
+        simCtx.strokeStyle = 'rgba(0,232,122,0.85)';
+        simCtx.lineWidth   = 2.5;
+        simCtx.stroke();
+        simCtx.setLineDash([]);
 
-    simCtx.restore();
+        // Origin dot
+        simCtx.beginPath();
+        simCtx.arc(sx, sy, 6, 0, Math.PI * 2);
+        simCtx.fillStyle = '#00e87a';
+        simCtx.fill();
+
+        // Target dot
+        simCtx.beginPath();
+        simCtx.arc(ex, ey, 5, 0, Math.PI * 2);
+        simCtx.fillStyle = '#ff304f';
+        simCtx.fill();
+
+        simCtx.restore();
+    }
 }
 
-// Update UI stats table
-function updateStatsTable() {
-    if (frameCounter % 6 !== 0) return; // Throttle to 10 FPS
+// ============================================================
+//  STATS TABLE
+// ============================================================
+function updateStats() {
+    if (frame % 6 !== 0) return;
 
     let html = '';
-    planets.forEach(planet => {
-        let distanceText = '-';
-        let speedText = '-';
-        let statusBadge = '';
 
-        if (planet.status === 'stable') {
-            const dx = planet.x - sun.x;
-            const dy = planet.y - sun.y;
-            const r = Math.sqrt(dx * dx + dy * dy);
-            distanceText = (r / 100).toFixed(2);
-            
-            const velocity = Math.sqrt(planet.vx * planet.vx + planet.vy * planet.vy);
-            speedText = (velocity * 30000).toLocaleString(undefined, { maximumFractionDigits: 0 });
-            
-            statusBadge = '<span class="badge badge-stable">Stable</span>';
-        } else if (planet.status === 'collided') {
-            statusBadge = '<span class="badge badge-collided">Crashed</span>';
-        } else if (planet.status === 'escaped') {
-            statusBadge = '<span class="badge badge-escaped">Escaped</span>';
-        }
+    for (const p of planets) {
+        const dx   = p.x - sun.x, dy = p.y - sun.y;
+        const dist = p.status === 'stable' ? (Math.hypot(dx, dy) / 100).toFixed(2) : '—';
+        const spd  = p.status === 'stable'
+            ? (Math.hypot(p.vx, p.vy) * 30000).toLocaleString(undefined, { maximumFractionDigits: 0 })
+            : '—';
+        const badge = p.status === 'stable'
+            ? '<span class="badge badge-stable">Stable</span>'
+            : p.status === 'collided'
+                ? '<span class="badge badge-collided">Crashed</span>'
+                : '<span class="badge badge-escaped">Escaped</span>';
 
-        html += `
-            <tr>
-                <td><strong>${planet.name}</strong></td>
-                <td>${distanceText}</td>
-                <td>${speedText}</td>
-                <td>${statusBadge}</td>
-            </tr>
-        `;
-    });
+        html += `<tr>
+            <td><strong>${p.name}</strong></td>
+            <td>${dist}</td>
+            <td>${spd}</td>
+            <td>${badge}</td>
+        </tr>`;
+    }
 
-    // Append Moon status to table
+    // Moon row
     if (moon) {
-        let distanceText = '-';
-        let speedText = '-';
-        let statusBadge = '';
+        const dist  = moon.status === 'stable'
+            ? (Math.hypot(moon.rx, moon.ry) / 100).toFixed(2) : '—';
+        const spd   = moon.status === 'stable'
+            ? (Math.hypot(moon.rvx, moon.rvy) * 30000).toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—';
+        const badge = moon.status === 'stable'
+            ? '<span class="badge badge-stable">Stable</span>'
+            : '<span class="badge badge-collided">Crashed</span>';
 
-        if (moon.status === 'stable') {
-            // Distance from Earth
-            distanceText = (Math.sqrt(moon.rx * moon.rx + moon.ry * moon.ry) / 100).toFixed(2);
-            const velocity = Math.sqrt(moon.rvx * moon.rvx + moon.rvy * moon.rvy);
-            speedText = (velocity * 30000).toLocaleString(undefined, { maximumFractionDigits: 0 });
-            statusBadge = '<span class="badge badge-stable">Stable</span>';
-        } else if (moon.status === 'collided') {
-            statusBadge = '<span class="badge badge-collided">Crashed</span>';
-        } else if (moon.status === 'escaped') {
-            statusBadge = '<span class="badge badge-escaped">Escaped</span>';
-        }
-
-        html += `
-            <tr>
-                <td><strong>🌙 Moon</strong></td>
-                <td>${distanceText}</td>
-                <td>${speedText}</td>
-                <td>${statusBadge}</td>
-            </tr>
-        `;
+        html += `<tr>
+            <td><strong>🌙 Moon</strong></td>
+            <td>${dist}</td>
+            <td>${spd}</td>
+            <td>${badge}</td>
+        </tr>`;
     }
 
     planetStatsBody.innerHTML = html;
 }
 
-// Master Loop
+// ============================================================
+//  MAIN LOOP
+// ============================================================
 function loop() {
     updatePhysics();
     drawSimulation();
-    updateStatsTable();
-
-    frameCounter++;
+    updateStats();
+    frame++;
     requestAnimationFrame(loop);
 }
 
-// Program Entry Point
+// ============================================================
+//  INIT
+// ============================================================
 resizeCanvases();
 initPlanets();
 loop();

@@ -2,121 +2,115 @@
 <html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gravity Simulation - Interactive Solar System</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Solar Gravity Simulator — Interactive Solar System</title>
     <meta name="description" content="An interactive, visual 2D physics-based gravity simulation of the Solar System. Change the Sun's mass, launch custom planets, and listen to synthesized space sounds.">
     <link rel="stylesheet" href="styles.css">
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!-- Background starfield canvas for ambient moving stars -->
+
+    <!-- Background starfield canvas -->
     <canvas id="starsCanvas"></canvas>
 
     <!-- Main physics simulation canvas -->
     <canvas id="simulationCanvas"></canvas>
 
-    <!-- Mobile Dashboard Toggle Button -->
-    <button id="dashboardToggle" class="dashboard-toggle-btn" aria-label="Toggle settings panel">
-        ⚙️
-    </button>
-
-    <!-- Glassmorphic Dashboard -->
-    <main class="dashboard" id="mainDashboard">
-        <header class="dashboard-header">
-            <div class="header-main">
-                <h1>Solar Gravity Sim</h1>
-                <button id="btnToggleAudio" class="audio-btn" aria-label="Toggle sound">🔇 Sound: Off</button>
-            </div>
-            <p class="subtitle">Change the Sun's mass and observe gravity orbit effects</p>
-        </header>
-
-        <section class="control-section">
-            <div class="control-group">
-                <label for="sunMassSlider" class="control-label">
-                    <span>Solar Mass:</span>
-                    <span id="sunMassValue" class="value-display">1.0x</span>
-                </label>
-                <input type="range" id="sunMassSlider" min="0.0" max="8.0" step="0.05" value="1.0" class="slider">
-                <div class="slider-labels">
-                    <span>Off (0x)</span>
-                    <span>Normal (1x)</span>
-                    <span>Giant (8x)</span>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <label for="simSpeedSlider" class="control-label">
-                    <span>Simulation Speed:</span>
-                    <span id="simSpeedValue" class="value-display">1.0x</span>
-                </label>
-                <input type="range" id="simSpeedSlider" min="0.1" max="5.0" step="0.1" value="1.0" class="slider">
-            </div>
-
-            <div class="control-group">
-                <span class="control-label">Interaction Mode:</span>
-                <div class="mode-toggle-group">
-                    <button id="modePan" class="btn btn-mode active">🖐️ Move Space</button>
-                    <button id="modeLaunch" class="btn btn-mode">🚀 Launch Planet</button>
-                </div>
-            </div>
-
-            <div class="button-grid">
-                <button id="btnPlayPause" class="btn btn-primary">Pause Sim</button>
-                <button id="btnReset" class="btn btn-secondary">Full Reset</button>
-                <button id="btnClearTrails" class="btn btn-tertiary">Clear Orbits</button>
-            </div>
-        </section>
-
-        <section class="presets-section">
-            <h3>Solar Presets</h3>
-            <div class="presets-grid">
-                <button id="presetNormal" class="btn btn-preset" data-mass="1.0">Stable System (1.0x)</button>
-                <button id="presetHeavy" class="btn btn-preset" data-mass="3.5">Massive Sun (3.5x)</button>
-                <button id="presetSupernova" class="btn btn-preset" data-mass="8.0">Gravitational Collapse (8.0x)</button>
-                <button id="presetLight" class="btn btn-preset" data-mass="0.25">Dying Sun (0.25x)</button>
-                <button id="presetZero" class="btn btn-preset" data-mass="0.0">Zero Gravity (0.0x)</button>
-            </div>
-        </section>
-
-        <section class="stats-section">
-            <h3>Orbital Mechanics Status</h3>
-            <div class="stats-table-container">
-                <table class="stats-table">
-                    <thead>
-                        <tr>
-                            <th>Celestial Body</th>
-                            <th>Distance (AU)</th>
-                            <th>Velocity (km/h)</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="planetStatsBody">
-                        <!-- Filled dynamically by simulation.js -->
-                    </tbody>
-                </table>
-            </div>
-        </section>
-    </main>
-
-    <!-- Detailed Status Alerts Overlay -->
-    <div id="alertOverlay" class="alert-overlay">
-        <!-- Floating notification bubbles will appear here -->
+    <!-- ===== FLOATING TOOLBAR (always visible, mobile-first) ===== -->
+    <div class="toolbar" id="toolbar">
+        <!-- Toggle Panel -->
+        <button class="tool-btn" id="btnTogglePanel" title="Toggle controls panel">⚙️</button>
+        <!-- Play/Pause -->
+        <button class="tool-btn tool-btn-primary" id="btnPlayPause" title="Play / Pause">⏸</button>
+        <!-- Reset -->
+        <button class="tool-btn" id="btnReset" title="Full Reset">↺</button>
+        <!-- Audio -->
+        <button class="tool-btn" id="btnToggleAudio" title="Toggle Sound">🔇</button>
+        <!-- Mode Toggle -->
+        <div class="tool-mode-group">
+            <button class="tool-btn tool-mode active" id="modePan" title="Pan & Zoom mode">🖐️</button>
+            <button class="tool-btn tool-mode" id="modeLaunch" title="Launch Planet mode">🚀</button>
+        </div>
     </div>
 
-    <!-- Instructions Overlay -->
-    <div class="instructions-panel" id="instructionsPanel">
-        <p>🚀 <strong>How to interact:</strong></p>
-        <ul>
-            <li><strong>slingshot:</strong> Click/tap and drag on space to launch a <strong>custom planet</strong>!</li>
-            <li><strong>pan & zoom:</strong> Drag to pan, scroll wheel or pinch fingers to zoom.</li>
-            <li><strong>physics:</strong> Adjusting the Sun's mass dynamically changes the orbits of all bodies in real-time.</li>
-        </ul>
+    <!-- ===== SIDE CONTROL PANEL ===== -->
+    <aside class="panel" id="mainPanel">
+
+        <!-- Header -->
+        <div class="panel-header">
+            <h1>Solar Gravity Sim</h1>
+            <button class="panel-close-btn" id="btnClosePanel" title="Hide panel">✕</button>
+        </div>
+
+        <p class="panel-subtitle">Adjust the Sun's mass and watch gravity reshape the orbits in real-time.</p>
+
+        <!-- Sun Mass Slider -->
+        <div class="control-block">
+            <div class="control-row">
+                <span class="control-label">Solar Mass</span>
+                <span id="sunMassValue" class="value-tag">1.00x</span>
+            </div>
+            <input type="range" id="sunMassSlider" min="0.0" max="8.0" step="0.05" value="1.0" class="slider">
+            <div class="slider-ticks">
+                <span>0× (Off)</span>
+                <span>1× Normal</span>
+                <span>8× Giant</span>
+            </div>
+        </div>
+
+        <!-- Speed Slider -->
+        <div class="control-block">
+            <div class="control-row">
+                <span class="control-label">Sim Speed</span>
+                <span id="simSpeedValue" class="value-tag">1.0x</span>
+            </div>
+            <input type="range" id="simSpeedSlider" min="0.1" max="5.0" step="0.1" value="1.0" class="slider">
+        </div>
+
+        <!-- Extra Buttons -->
+        <div class="extra-buttons">
+            <button id="btnClearTrails" class="btn btn-ghost">Clear Trails</button>
+        </div>
+
+        <!-- Presets -->
+        <div class="section-title">Presets</div>
+        <div class="presets-grid">
+            <button class="btn btn-preset btn-preset-wide" id="presetNormal" data-mass="1.0">✦ Stable System (1.0×)</button>
+            <button class="btn btn-preset" id="presetHeavy" data-mass="3.5">Massive Sun (3.5×)</button>
+            <button class="btn btn-preset" id="presetLight" data-mass="0.25">Dying Sun (0.25×)</button>
+            <button class="btn btn-preset" id="presetSupernova" data-mass="8.0">Collapse (8.0×)</button>
+            <button class="btn btn-preset" id="presetZero" data-mass="0.0">No Gravity (0.0×)</button>
+        </div>
+
+        <!-- Planet Status Table -->
+        <div class="section-title">Orbital Status</div>
+        <div class="table-wrap">
+            <table class="stats-table">
+                <thead>
+                    <tr>
+                        <th>Body</th>
+                        <th>Dist (AU)</th>
+                        <th>Speed</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="planetStatsBody"></tbody>
+            </table>
+        </div>
+
+    </aside>
+
+    <!-- ===== ALERT BUBBLES ===== -->
+    <div id="alertOverlay" class="alert-overlay"></div>
+
+    <!-- ===== HOW-TO HINT (dismissible) ===== -->
+    <div class="hint-bar" id="hintBar">
+        <span>🖐️ <strong>Pan mode:</strong> drag to move · scroll/pinch to zoom &nbsp;|&nbsp; 🚀 <strong>Launch mode:</strong> drag to fling a planet</span>
+        <button class="hint-close" id="btnDismissHint">✕</button>
     </div>
 
-    <!-- Scripts -->
     <script src="simulation.js"></script>
 </body>
 </html>
