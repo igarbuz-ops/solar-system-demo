@@ -1,7 +1,7 @@
 :root {
     --bg-gradient-start: #030310;
     --bg-gradient-end: #09081a;
-    --panel-bg: rgba(15, 15, 30, 0.55);
+    --panel-bg: rgba(15, 15, 30, 0.65);
     --panel-border: rgba(255, 255, 255, 0.08);
     --text-primary: #f0f0f8;
     --text-secondary: #a0a0c0;
@@ -19,7 +19,7 @@
 }
 
 body {
-    font-family: 'Rubik', 'Outfit', sans-serif;
+    font-family: 'Outfit', 'Rubik', sans-serif;
     background: linear-gradient(135deg, var(--bg-gradient-start), var(--bg-gradient-end));
     color: var(--text-primary);
     min-height: 100vh;
@@ -47,18 +47,42 @@ body {
     width: 100%;
     height: 100%;
     z-index: 2;
-    cursor: grab;
+    cursor: crosshair;
 }
 
-#simulationCanvas:active {
-    cursor: grabbing;
+/* Mobile Dashboard Toggle Button */
+.dashboard-toggle-btn {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 100;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: white;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    display: none; /* Only show on mobile */
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    transition: all 0.2s;
+}
+
+.dashboard-toggle-btn:hover {
+    transform: scale(1.05);
+    background: rgba(255, 255, 255, 0.1);
 }
 
 /* Glassmorphic Dashboard Panel */
 .dashboard {
     position: absolute;
     top: 24px;
-    right: 24px;
+    left: 24px;
     width: 380px;
     max-height: calc(100vh - 48px);
     background: var(--panel-bg);
@@ -75,7 +99,7 @@ body {
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
-    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s;
 }
 
 .dashboard::-webkit-scrollbar {
@@ -87,18 +111,57 @@ body {
     border-radius: 4px;
 }
 
+.dashboard-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.header-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
 .dashboard-header h1 {
-    font-size: 1.5rem;
-    font-weight: 700;
+    font-size: 1.45rem;
+    font-weight: 800;
     background: linear-gradient(90deg, #00ff88, #8a2be2);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    margin-bottom: 6px;
+    margin-bottom: 2px;
 }
 
 .dashboard-header .subtitle {
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     color: var(--text-secondary);
+    line-height: 1.25;
+}
+
+/* Audio button */
+.audio-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: var(--text-primary);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.audio-btn:hover {
+    background: rgba(138, 43, 226, 0.2);
+    border-color: var(--primary-color);
+}
+
+.audio-btn.active {
+    background: rgba(0, 255, 136, 0.15);
+    border-color: var(--success-color);
+    color: white;
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
 }
 
 /* Controls */
@@ -117,8 +180,8 @@ body {
 .control-label {
     display: flex;
     justify-content: space-between;
-    font-size: 0.9rem;
-    font-weight: 500;
+    font-size: 0.88rem;
+    font-weight: 600;
     color: var(--text-primary);
 }
 
@@ -126,9 +189,9 @@ body {
     color: var(--success-color);
     font-family: monospace;
     font-weight: bold;
-    font-size: 1rem;
+    font-size: 0.95rem;
     background: rgba(0, 255, 136, 0.1);
-    padding: 2px 8px;
+    padding: 1px 6px;
     border-radius: 4px;
     border: 1px solid rgba(0, 255, 136, 0.2);
 }
@@ -164,14 +227,14 @@ body {
 .slider-labels {
     display: flex;
     justify-content: space-between;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     color: var(--text-secondary);
 }
 
 /* Button Grid */
 .button-grid {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-columns: 2fr 1.2fr 1.2fr;
     gap: 8px;
     margin-top: 8px;
 }
@@ -179,14 +242,48 @@ body {
 .btn {
     border: none;
     outline: none;
-    padding: 10px;
+    padding: 10px 6px;
     border-radius: 8px;
     font-family: inherit;
-    font-size: 0.85rem;
-    font-weight: 500;
+    font-size: 0.82rem;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease-in-out;
     text-align: center;
+}
+
+/* Mode Toggles */
+.mode-toggle-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 3px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.btn-mode {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 6px 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-mode:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-mode.active {
+    background: linear-gradient(135deg, var(--primary-color), #b5179e);
+    color: white;
+    box-shadow: 0 2px 8px var(--primary-glow);
 }
 
 .btn-primary {
@@ -228,8 +325,8 @@ body {
 
 /* Presets */
 .presets-section h3 {
-    font-size: 0.95rem;
-    font-weight: 600;
+    font-size: 0.9rem;
+    font-weight: 700;
     color: var(--text-secondary);
     margin-bottom: 10px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
@@ -263,8 +360,8 @@ body {
 
 /* Stats Section */
 .stats-section h3 {
-    font-size: 0.95rem;
-    font-weight: 600;
+    font-size: 0.9rem;
+    font-weight: 700;
     color: var(--text-secondary);
     margin-bottom: 10px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
@@ -279,8 +376,8 @@ body {
 .stats-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.75rem;
-    text-align: right;
+    font-size: 0.72rem;
+    text-align: left;
 }
 
 .stats-table th, .stats-table td {
@@ -290,7 +387,7 @@ body {
 
 .stats-table th {
     color: var(--text-secondary);
-    font-weight: 500;
+    font-weight: 600;
 }
 
 .stats-table td {
@@ -302,7 +399,7 @@ body {
     padding: 2px 6px;
     border-radius: 4px;
     font-weight: bold;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     display: inline-block;
 }
 
@@ -348,7 +445,7 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     color: var(--text-primary);
     pointer-events: auto;
 }
@@ -365,13 +462,32 @@ body {
     background: var(--panel-bg);
     backdrop-filter: blur(12px);
     border: 1px solid var(--panel-border);
-    border-radius: 8px;
-    padding: 12px 16px;
-    max-width: 400px;
+    border-radius: 12px;
+    padding: 16px 20px;
+    max-width: 380px;
     z-index: 9;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     color: var(--text-secondary);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    line-height: 1.4;
+}
+
+.instructions-panel p {
+    color: var(--text-primary);
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.instructions-panel ul {
+    list-style-type: none;
+}
+
+.instructions-panel li {
+    margin-bottom: 4px;
+}
+
+.instructions-panel li strong {
+    color: #e29b3e;
 }
 
 /* Keyframes */
@@ -394,15 +510,48 @@ body {
 }
 
 /* Responsive adjustment */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
+    .dashboard-toggle-btn {
+        display: flex; /* Show toggle button on tablets and mobiles */
+    }
+
+    .dashboard {
+        top: 76px;
+        left: 16px;
+        width: 320px;
+        max-height: calc(100vh - 100px);
+        padding: 16px;
+        gap: 15px;
+    }
+
+    /* JavaScript toggles this class to collapse/expand dashboard on mobile */
+    .dashboard.collapsed {
+        transform: translateX(-120%);
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .instructions-panel {
+        max-width: calc(100% - 32px);
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+        font-size: 0.75rem;
+        padding: 10px 14px;
+    }
+}
+
+@media (max-width: 480px) {
     .dashboard {
         width: calc(100% - 32px);
-        right: 16px;
-        top: 16px;
-        max-height: 50vh;
-        padding: 16px;
     }
+    
+    .button-grid {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+
     .instructions-panel {
-        display: none;
+        display: none; /* Hide instructions on small mobiles to maximize space */
     }
 }

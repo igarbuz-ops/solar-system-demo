@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>סימולציית כבידה - מערכת השמש האינטראקטיבית</title>
-    <meta name="description" content="סימולציה גרפית ויזואלית אינטראקטיבית של כוח המשיכה ומערכת השמש. שנה את מסת השמש וראה את ההשפעה על מסלולי כוכבי הלכת בזמן אמת.">
+    <title>Gravity Simulation - Interactive Solar System</title>
+    <meta name="description" content="An interactive, visual 2D physics-based gravity simulation of the Solar System. Change the Sun's mass, launch custom planets, and listen to synthesized space sounds.">
     <link rel="stylesheet" href="styles.css">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,63 +18,79 @@
     <!-- Main physics simulation canvas -->
     <canvas id="simulationCanvas"></canvas>
 
+    <!-- Mobile Dashboard Toggle Button -->
+    <button id="dashboardToggle" class="dashboard-toggle-btn" aria-label="Toggle settings panel">
+        ⚙️
+    </button>
+
     <!-- Glassmorphic Dashboard -->
     <main class="dashboard" id="mainDashboard">
         <header class="dashboard-header">
-            <h1>סימולציית מערכת השמש</h1>
-            <p class="subtitle">שנה את מסת השמש וצפה בשינויים במסלולי הכבידה</p>
+            <div class="header-main">
+                <h1>Solar Gravity Sim</h1>
+                <button id="btnToggleAudio" class="audio-btn" aria-label="Toggle sound">🔇 Sound: Off</button>
+            </div>
+            <p class="subtitle">Change the Sun's mass and observe gravity orbit effects</p>
         </header>
 
         <section class="control-section">
             <div class="control-group">
                 <label for="sunMassSlider" class="control-label">
-                    <span>מסת השמש:</span>
+                    <span>Solar Mass:</span>
                     <span id="sunMassValue" class="value-display">1.0x</span>
                 </label>
                 <input type="range" id="sunMassSlider" min="0.0" max="8.0" step="0.05" value="1.0" class="slider">
                 <div class="slider-labels">
-                    <span>מכובה (0x)</span>
-                    <span>רגיל (1x)</span>
-                    <span>ענק (8x)</span>
+                    <span>Off (0x)</span>
+                    <span>Normal (1x)</span>
+                    <span>Giant (8x)</span>
                 </div>
             </div>
 
             <div class="control-group">
                 <label for="simSpeedSlider" class="control-label">
-                    <span>מהירות הסימולציה:</span>
+                    <span>Simulation Speed:</span>
                     <span id="simSpeedValue" class="value-display">1.0x</span>
                 </label>
                 <input type="range" id="simSpeedSlider" min="0.1" max="5.0" step="0.1" value="1.0" class="slider">
             </div>
 
+            <div class="control-group">
+                <span class="control-label">Interaction Mode:</span>
+                <div class="mode-toggle-group">
+                    <button id="modePan" class="btn btn-mode active">🖐️ Move Space</button>
+                    <button id="modeLaunch" class="btn btn-mode">🚀 Launch Planet</button>
+                </div>
+            </div>
+
             <div class="button-grid">
-                <button id="btnPlayPause" class="btn btn-primary">השהה סימולציה</button>
-                <button id="btnReset" class="btn btn-secondary">איפוס מלא</button>
-                <button id="btnClearTrails" class="btn btn-tertiary">נקה מסלולים</button>
+                <button id="btnPlayPause" class="btn btn-primary">Pause Sim</button>
+                <button id="btnReset" class="btn btn-secondary">Full Reset</button>
+                <button id="btnClearTrails" class="btn btn-tertiary">Clear Orbits</button>
             </div>
         </section>
 
         <section class="presets-section">
-            <h3>קיצורי דרך ומצבים מהירים</h3>
+            <h3>Solar Presets</h3>
             <div class="presets-grid">
-                <button id="presetNormal" class="btn btn-preset" data-mass="1.0">מערכת יציבה (1.0x)</button>
-                <button id="presetHeavy" class="btn btn-preset" data-mass="3.5">שמש מסיבית (3.5x)</button>
-                <button id="presetSupernova" class="btn btn-preset" data-mass="8.0">קריסה כבידתית (8.0x)</button>
-                <button id="presetLight" class="btn btn-preset" data-mass="0.25">שמש גוססת (0.25x)</button>
-                <button id="presetZero" class="btn btn-preset" data-mass="0.0">חלל חופשי (0.0x)</button>
+                <button id="presetNormal" class="btn btn-preset" data-mass="1.0">Stable System (1.0x)</button>
+                <button id="presetHeavy" class="btn btn-preset" data-mass="3.5">Massive Sun (3.5x)</button>
+                <button id="presetSupernova" class="btn btn-preset" data-mass="8.0">Gravitational Collapse (8.0x)</button>
+                <button id="presetLight" class="btn btn-preset" data-mass="0.25">Dying Sun (0.25x)</button>
+                <button id="presetZero" class="btn btn-preset" data-mass="0.0">Zero Gravity (0.0x)</button>
             </div>
         </section>
 
         <section class="stats-section">
-            <h3>מצב גרמי השמיים</h3>
+            <h3>Orbital Mechanics Status</h3>
             <div class="stats-table-container">
                 <table class="stats-table">
                     <thead>
                         <tr>
-                            <th>כוכב לכת</th>
-                            <th>מרחק (יח' יחסיות)</th>
-                            <th>מהירות (קמ"ש יחסי)</th>
-                            <th>סטטוס</th>
+                            <th>Celestial Body</th>
+                            <th>Distance (AU)</th>
+                            <th>Velocity (km/h)</th>
+                            <th>Status</th>
                         </tr>
                     </thead>
                     <tbody id="planetStatsBody">
@@ -91,8 +107,13 @@
     </div>
 
     <!-- Instructions Overlay -->
-    <div class="instructions-panel">
-        <p>💡 <strong>טיפ:</strong> הגדלת מסת השמש תגביר את כוח המשיכה ותגרום לכוכבי הלכת להאיץ ולקרוס פנימה. הקטנת המסה תאפשר להם לברוח למעמקי החלל.</p>
+    <div class="instructions-panel" id="instructionsPanel">
+        <p>🚀 <strong>How to interact:</strong></p>
+        <ul>
+            <li><strong>slingshot:</strong> Click/tap and drag on space to launch a <strong>custom planet</strong>!</li>
+            <li><strong>pan & zoom:</strong> Drag to pan, scroll wheel or pinch fingers to zoom.</li>
+            <li><strong>physics:</strong> Adjusting the Sun's mass dynamically changes the orbits of all bodies in real-time.</li>
+        </ul>
     </div>
 
     <!-- Scripts -->
