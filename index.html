@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>סימולציית כבידה - מערכת השמש האינטראקטיבית</title>
+    <meta name="description" content="סימולציה גרפית ויזואלית אינטראקטיבית של כוח המשיכה ומערכת השמש. שנה את מסת השמש וראה את ההשפעה על מסלולי כוכבי הלכת בזמן אמת.">
+    <link rel="stylesheet" href="styles.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Background starfield canvas for ambient moving stars -->
+    <canvas id="starsCanvas"></canvas>
+
+    <!-- Main physics simulation canvas -->
+    <canvas id="simulationCanvas"></canvas>
+
+    <!-- Glassmorphic Dashboard -->
+    <main class="dashboard" id="mainDashboard">
+        <header class="dashboard-header">
+            <h1>סימולציית מערכת השמש</h1>
+            <p class="subtitle">שנה את מסת השמש וצפה בשינויים במסלולי הכבידה</p>
+        </header>
+
+        <section class="control-section">
+            <div class="control-group">
+                <label for="sunMassSlider" class="control-label">
+                    <span>מסת השמש:</span>
+                    <span id="sunMassValue" class="value-display">1.0x</span>
+                </label>
+                <input type="range" id="sunMassSlider" min="0.0" max="8.0" step="0.05" value="1.0" class="slider">
+                <div class="slider-labels">
+                    <span>מכובה (0x)</span>
+                    <span>רגיל (1x)</span>
+                    <span>ענק (8x)</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label for="simSpeedSlider" class="control-label">
+                    <span>מהירות הסימולציה:</span>
+                    <span id="simSpeedValue" class="value-display">1.0x</span>
+                </label>
+                <input type="range" id="simSpeedSlider" min="0.1" max="5.0" step="0.1" value="1.0" class="slider">
+            </div>
+
+            <div class="button-grid">
+                <button id="btnPlayPause" class="btn btn-primary">השהה סימולציה</button>
+                <button id="btnReset" class="btn btn-secondary">איפוס מלא</button>
+                <button id="btnClearTrails" class="btn btn-tertiary">נקה מסלולים</button>
+            </div>
+        </section>
+
+        <section class="presets-section">
+            <h3>קיצורי דרך ומצבים מהירים</h3>
+            <div class="presets-grid">
+                <button id="presetNormal" class="btn btn-preset" data-mass="1.0">מערכת יציבה (1.0x)</button>
+                <button id="presetHeavy" class="btn btn-preset" data-mass="3.5">שמש מסיבית (3.5x)</button>
+                <button id="presetSupernova" class="btn btn-preset" data-mass="8.0">קריסה כבידתית (8.0x)</button>
+                <button id="presetLight" class="btn btn-preset" data-mass="0.25">שמש גוססת (0.25x)</button>
+                <button id="presetZero" class="btn btn-preset" data-mass="0.0">חלל חופשי (0.0x)</button>
+            </div>
+        </section>
+
+        <section class="stats-section">
+            <h3>מצב גרמי השמיים</h3>
+            <div class="stats-table-container">
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>כוכב לכת</th>
+                            <th>מרחק (יח' יחסיות)</th>
+                            <th>מהירות (קמ"ש יחסי)</th>
+                            <th>סטטוס</th>
+                        </tr>
+                    </thead>
+                    <tbody id="planetStatsBody">
+                        <!-- Filled dynamically by simulation.js -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- Detailed Status Alerts Overlay -->
+    <div id="alertOverlay" class="alert-overlay">
+        <!-- Floating notification bubbles will appear here -->
+    </div>
+
+    <!-- Instructions Overlay -->
+    <div class="instructions-panel">
+        <p>💡 <strong>טיפ:</strong> הגדלת מסת השמש תגביר את כוח המשיכה ותגרום לכוכבי הלכת להאיץ ולקרוס פנימה. הקטנת המסה תאפשר להם לברוח למעמקי החלל.</p>
+    </div>
+
+    <!-- Scripts -->
+    <script src="simulation.js"></script>
+</body>
+</html>
